@@ -6,20 +6,10 @@ fn main() {
     let mut max_seat_id = 0;
     for wrapped_line in io::stdin().lock().lines() {
         let line = wrapped_line.unwrap();
-        let mut row_min = 0;
-        let mut row_max = 127;
-        let mut col_min = 0;
-        let mut col_max = 7;
+        let mut seat_id : usize = 0;
         for c in line.chars() {
-            match c {
-                'F' => { row_max = row_min + (row_max - row_min + 1) / 2 - 1; }
-                'B' => { row_min = row_min + (row_max - row_min + 1) / 2; }
-                'L' => { col_max = col_min + (col_max - col_min + 1) / 2 - 1; }
-                'R' => { col_min = col_min + (col_max - col_min + 1) / 2; }
-                _ => {}
-            }
+            seat_id = (seat_id << 1) + (if c == 'B' || c == 'R' { 1 } else { 0 })
         }
-        let seat_id = row_min * 8 + col_min;
         full[seat_id] = true;
         max_seat_id = max(seat_id, max_seat_id);
     }
