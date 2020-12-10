@@ -6,20 +6,18 @@ fn count_ways(input_nums : &Vec<u64>) -> u64 {
     for adapter in input_nums {
         have_adapter[*adapter as usize] = true;
     }
-    let mut ways : Vec<u64> = Vec::with_capacity(max_jolts + 1);
-    ways.push(1); // there's one way to get 0 jolts: plug in to the wall
-    for jolts in 1..(max_jolts+1) {
-        if have_adapter[jolts] {
-            let min = std::cmp::max(0, jolts as i32 - 3) as usize; // we can adapt from jolts - 3 to jolts, as long as jolts - 3 is non-negative
-            let max = jolts - 1;
-            let accessible_jolts_range = min..(max+1);
-            let ways_this_jolt = ways.get(accessible_jolts_range).unwrap().iter().sum();
-            ways.push(ways_this_jolt);
-        } else {
-            ways.push(0);
-        }
+    let mut ways : [u64; 3] = [
+      1,
+      if have_adapter[1] { 1 } else { 0 },
+      if have_adapter[2] { if have_adapter[1] { 2 } else { 1 } } else { 0 }
+    ];
+    for jolts in 3..(max_jolts+1) {
+        let sum = ways[0] + ways[1] + ways[2];
+        ways[0] = ways[1];
+        ways[1] = ways[2];
+        ways[2] = if have_adapter[jolts] { sum } else { 0 };
     }
-    ways[max_jolts]
+    ways[2]
 }
 
 fn main() {
