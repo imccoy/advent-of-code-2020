@@ -9,21 +9,17 @@ fn split_once(string: &str, delim: &str) -> (String, String) {
 
 fn count_ways_of_containing(start_bag : String, bags_contained_by : HashMap<String, HashSet<String>>) -> usize {
     let mut ways : HashSet<String> = HashSet::new();
-    let mut new_ways : HashSet<String> = HashSet::new();
-    new_ways.insert(start_bag);
-    while !new_ways.is_empty() {
-        ways.extend(new_ways.iter().map(|x| x.to_string()));
-        let mut next_ways : HashSet<String> = HashSet::new();
-        for way in new_ways {
-            if let Some(reachable_bags) = bags_contained_by.get(&way) {
-                for reachable_bag in reachable_bags {
-                    if !ways.contains(reachable_bag) {
-                        next_ways.insert(reachable_bag.to_string());
-                    }
+    let mut new_ways : Vec<String> = Vec::new();
+    new_ways.push(start_bag);
+    while let Some(new_way) = new_ways.pop() {
+        ways.insert(new_way.to_string());
+        if let Some(reachable_bags) = bags_contained_by.get(&new_way) {
+            for reachable_bag in reachable_bags {
+                if !ways.contains(reachable_bag) {
+                    new_ways.push(reachable_bag.to_string());
                 }
             }
         }
-        new_ways = next_ways;
     }
 
     ways.len() - 1
