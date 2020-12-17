@@ -95,10 +95,11 @@ fn main() {
         if fields.len() != 1 {
             println!("E_NOT_SOPHISTICATED");
         }
-        let field_name = &possibles[fields[0]][0];
+        let field_name = possibles[fields[0]][0].to_string();
         assignments.push((fields[0], field_name.to_string()));
-        // this next line is haskell that happens to be written in rust syntax and is 100% one of the sins I will be answering for
-        possibles = possibles.iter().map(|possible| possible.iter().filter(|f| field_name != *f).map(|f| f.to_string()).collect()).collect();
+        for possible in &mut possibles {
+            possible.retain(|f| field_name != *f);
+        }
     }
     
     println!("part 2: {}", assignments
