@@ -38,14 +38,16 @@ fn lex(line : String) -> Vec<Token> {
 }
 
 
-fn parse1(lexed : &mut Iter<Token>) -> Expr {
-    if let Some(op) = lexed.next() {
+fn parse1(lexed : &mut Expectant) -> Expr {
+    if let Some(op) = next(lexed) {
         match op {
             Token::Num(n) => {
-                return Expr::Num(*n);
+                return Expr::Num(n);
             },
             Token::OpenParen => {
-                return Expr::Bracketed(Box::new(parse(lexed)));
+                let expr = Expr::Bracketed(Box::new(parse(lexed)));
+                expect(lexed, |tok| match tok { Token::CloseParen => true, _ => false });
+                return expr;
             },
             _ => {
                 panic!("what.");
@@ -56,30 +58,27 @@ fn parse1(lexed : &mut Iter<Token>) -> Expr {
     }
 }
 
-fn parse(lexed : &mut Iter<Token>) -> Expr {
-    let mut so_far : Option<Expr> = None;
-    while let Some(op) = lexed.next() {
-        match op {
-            Token::Num(n) => {
-                so_far = Some(Expr::Num(*n));
-            }
-            Token::OpenParen => {
-                so_far = Some(Expr::Bracketed(Box::new(parse(lexed))));
-            }
-            Token::CloseParen => {
-                return so_far.unwrap();
-            },
-            Token::Plus => {
-                let second = parse1(lexed);
-                so_far = Some(Expr::Add(Box::new(so_far.unwrap()), Box::new(second)));
-            },
-            Token::Times => {
-                let second = parse1(lexed);
-                so_far = Some(Expr::Multiply(Box::new(so_far.unwrap()), Box::new(second)));
-            }
+// expr = '(' expr ')' | expr '+' expr | expr '*' expr | num
+
+// op = '+' | '*'
+// expr = (expr op expr1) op expr
+
+fn parse(lexed : &mut Expectant) -> Expr {
+    let mut lhs = parse1(lexed);
+    loop {
+        let mut nothing = true;
+        if expect(lexed, |tok| match tok { Token::Plus => true, _ => false }) {
+            lhs = Expr::Add(Box::new(lhs), Box::new(parse1(lexed)));
+            nothing = false;
+        } else if expect(lexed, |tok| match tok { Token::Times => true, _ => false }) {
+            lhs = Expr::Multiply(Box::new(lhs), Box::new(parse1(lexed)));
+            nothing = false;
+        }
+        if nothing {
+            break;
         }
     }
-    return so_far.unwrap();
+    return lhs;
 }
 
 struct Expectant<'a> {
@@ -181,12 +180,13 @@ fn main() {
         let line = wrapped_line.unwrap();
         let lexed = lex(line);
 
-        let parsed = parse(&mut lexed.iter());
+        let mut ex2 = Expectant { iter: &mut lexed.iter(), current_tok: None };
+        let parsed = parse(&mut ex2);
         let evaled = eval(parsed);
         sum += evaled;
 
-        let mut ex = Expectant { iter: &mut lexed.iter(), current_tok: None };
-        let parsed2 = parse2_products(&mut ex);
+        let mut ex2 = Expectant { iter: &mut lexed.iter(), current_tok: None };
+        let parsed2 = parse2_products(&mut ex2);
         let evaled2 = eval(parsed2);
         sum2 += evaled2;
     }
