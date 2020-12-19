@@ -74,6 +74,7 @@ fn parse_bin(lhs : Expr, lexed : &mut Expectant) -> Expr {
     return lhs;
 }
 
+// this is a utility to make the traditional "consume-next-token-if-it-looks-like-X" device
 struct Expectant<'a> {
     iter: &'a mut Iter<'a, Token>,
     current_tok: Option<Token>
@@ -166,23 +167,118 @@ fn eval(expr : Expr) -> u64 {
     }
 }
 
+
+
+
+/* I thought doing something in an utterly unprincipled ad-hoc way
+ * might actually be faster. And then I thought it might be fun to
+ * try.
+ *
+ * Welcome to lol.
+ */
+
+#[derive(Debug, Clone)]
+enum ExprLol { Bracketed(Vec<ExprLol>), Token(Token) }
+
+fn unparen_lol(tokens : &mut Iter<Token>) -> Vec<ExprLol> {
+    let mut result = Vec::new();
+    while let Some(t) = tokens.next() {
+        match t {
+            Token::OpenParen => {
+                result.push(ExprLol::Bracketed(unparen_lol(tokens)));
+            },
+            Token::CloseParen => {
+                break;
+            },
+            _ => {
+                result.push(ExprLol::Token(*t));
+            }
+        }
+    }
+    return result;
+}
+
+fn eval_lol_at(tree : &Vec<ExprLol>, index : usize) -> u64 {
+    return match &tree[index] {
+        ExprLol::Token(Token::Num(num)) => *num,
+        ExprLol::Bracketed(subtree) => eval_lol(&subtree),
+        _ => panic!("lol")
+    };
+}
+
+fn eval_lol(tree : &Vec<ExprLol>) -> u64 {
+    let mut n = eval_lol_at(tree, 0);
+    let mut idx = 1;
+    while idx < tree.len() {
+        match tree[idx] {
+            ExprLol::Token(Token::Plus) => {
+                n += eval_lol_at(tree, idx + 1);
+                idx += 2;
+            },
+            ExprLol::Token(Token::Times) => {
+                n *= eval_lol_at(tree, idx + 1);
+                idx += 2;
+            },
+            _ => panic!("lol")
+        };
+    }
+    return n;
+}
+
+fn precedence_lol(tree : &Vec<ExprLol>) -> Vec<ExprLol> {
+    let mut results = Vec::new();
+    let mut index = 1;
+    let mut tree : Vec<ExprLol> = tree.iter().map(|t| match t {
+        ExprLol::Bracketed(nexts) => ExprLol::Bracketed(precedence_lol(&nexts)),
+        token => token.clone()
+    }).collect();
+    results.push(tree[0].clone());
+    while index < tree.len() {
+        let next = &tree[index + 1];
+        match &tree[index] {
+            ExprLol::Token(Token::Plus) => {
+                let last = results.pop().unwrap();
+                results.push(ExprLol::Bracketed(vec!(last, ExprLol::Token(Token::Plus), next.clone())));
+            },
+            ExprLol::Token(Token::Times) => {
+                results.push(tree[index].clone());
+                results.push(next.clone());
+            },
+            _ => panic!("lol")
+        }
+        index += 2;
+    }
+    return results;
+}
+/*
+ * </lol>
+ */
+
 fn main() {
     let mut sum = 0;
     let mut sum2 = 0;
+    let mut sumlol = 0;
+    let mut sum2lol = 0;
     for wrapped_line in io::stdin().lock().lines() {
         let line = wrapped_line.unwrap();
-        let lexed = lex(line);
+        let lexed = lex(line.clone());
 
         let mut ex2 = Expectant { iter: &mut lexed.iter(), current_tok: None };
         let parsed = parse(&mut ex2);
         let evaled = eval(parsed);
         sum += evaled;
 
+        sumlol += eval_lol(&unparen_lol(&mut lexed.iter()));
+
         let mut ex2 = Expectant { iter: &mut lexed.iter(), current_tok: None };
         let parsed2 = parse2_products(&mut ex2);
         let evaled2 = eval(parsed2);
         sum2 += evaled2;
+
+        sum2lol += eval_lol(&precedence_lol(&unparen_lol(&mut lexed.iter())));
     }
     println!("{}", sum);
     println!("{}", sum2);
+    println!("{}", sumlol);
+    println!("{}", sum2lol);
 }
