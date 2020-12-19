@@ -38,7 +38,7 @@ fn lex(line : String) -> Vec<Token> {
 }
 
 
-fn parse1(lexed : &mut Expectant) -> Expr {
+fn parse_un(lexed : &mut Expectant) -> Expr {
     if let Some(op) = next(lexed) {
         match op {
             Token::Num(n) => {
@@ -58,25 +58,18 @@ fn parse1(lexed : &mut Expectant) -> Expr {
     }
 }
 
-// expr = '(' expr ')' | expr '+' expr | expr '*' expr | num
-
-// op = '+' | '*'
-// expr = (expr op expr1) op expr
-
 fn parse(lexed : &mut Expectant) -> Expr {
-    let mut lhs = parse1(lexed);
-    loop {
-        let mut nothing = true;
-        if expect(lexed, |tok| match tok { Token::Plus => true, _ => false }) {
-            lhs = Expr::Add(Box::new(lhs), Box::new(parse1(lexed)));
-            nothing = false;
-        } else if expect(lexed, |tok| match tok { Token::Times => true, _ => false }) {
-            lhs = Expr::Multiply(Box::new(lhs), Box::new(parse1(lexed)));
-            nothing = false;
-        }
-        if nothing {
-            break;
-        }
+    let lhs = parse_un(lexed);
+    return parse_bin(lhs, lexed);
+}
+
+fn parse_bin(lhs : Expr, lexed : &mut Expectant) -> Expr {
+    if expect(lexed, |tok| match tok { Token::Plus => true, _ => false }) {
+        let rhs = parse_un(lexed);
+        return parse_bin(Expr::Add(Box::new(lhs), Box::new(rhs)), lexed);
+    } else if expect(lexed, |tok| match tok { Token::Times => true, _ => false }) {
+        let rhs = parse_un(lexed);
+        return parse_bin(Expr::Multiply(Box::new(lhs), Box::new(rhs)), lexed);
     }
     return lhs;
 }
