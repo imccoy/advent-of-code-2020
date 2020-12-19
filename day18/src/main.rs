@@ -1,7 +1,7 @@
 use std::io::{self, BufRead};
 use std::slice::Iter;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum Token { Plus, Times, OpenParen, CloseParen, Num(u64) }
 
 #[derive(Debug)]
@@ -45,7 +45,7 @@ fn parse1(lexed : &mut Iter<Token>) -> Expr {
                 return Expr::Num(*n);
             },
             Token::OpenParen => {
-                return parse(lexed);
+                return Expr::Bracketed(Box::new(parse(lexed)));
             },
             _ => {
                 panic!("what.");
@@ -56,8 +56,6 @@ fn parse1(lexed : &mut Iter<Token>) -> Expr {
     }
 }
 
-
-
 fn parse(lexed : &mut Iter<Token>) -> Expr {
     let mut so_far : Option<Expr> = None;
     while let Some(op) = lexed.next() {
@@ -66,7 +64,7 @@ fn parse(lexed : &mut Iter<Token>) -> Expr {
                 so_far = Some(Expr::Num(*n));
             }
             Token::OpenParen => {
-                so_far = Some(parse(lexed));
+                so_far = Some(Expr::Bracketed(Box::new(parse(lexed))));
             }
             Token::CloseParen => {
                 return so_far.unwrap();
@@ -84,6 +82,89 @@ fn parse(lexed : &mut Iter<Token>) -> Expr {
     return so_far.unwrap();
 }
 
+struct Expectant<'a> {
+    iter: &'a mut Iter<'a, Token>,
+    current_tok: Option<Token>
+}
+
+fn next(lexed : &mut Expectant) -> Option<Token> {
+    match lexed.current_tok {
+        Some(token) => {
+            lexed.current_tok = None;
+            return Some(token);
+        },
+        None => {
+            return lexed.iter.next().map(|t| *t);
+        }
+    }
+}
+
+fn expect<F>(lexed : &mut Expectant, f : F) -> bool
+    where F : FnOnce(Token) -> bool
+{
+    if lexed.current_tok.is_none() {
+        lexed.current_tok = lexed.iter.next().map(|t| *t);
+    }
+    if let Some(tok) = lexed.current_tok {
+        if f(tok) {
+            lexed.current_tok = None;
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+}
+
+fn parse2_n(lexed : &mut Expectant) -> Expr {
+    if let Some(tok) = next(lexed) {
+        match tok {
+            Token::Num(n) => {
+                return Expr::Num(n);
+            },
+            Token::OpenParen => {
+                let expr = Expr::Bracketed(Box::new(parse2_products(lexed)));
+                expect(lexed, |tok| match tok { Token::CloseParen => true, _ => false });
+                return expr;
+            },
+            _ => panic!("not a number")
+        }
+    }
+    panic!("no number");
+}
+
+fn parse2_next_n(lexed : &mut Expectant) -> Option<Expr> {
+    if expect(lexed, |tok| match tok { Token::Plus => true, _ => false }) {
+        return Some(parse2_sums(lexed));
+    }
+    return None;
+}
+
+fn parse2_sums(lexed : &mut Expectant) -> Expr {
+    let mut n = parse2_n(lexed);
+    while let Some(n2) = parse2_next_n(lexed) {
+        n = Expr::Add(Box::new(n), Box::new(n2));
+    }
+    return n;
+
+}
+
+fn parse2_next_sums(lexed : &mut Expectant) -> Option<Expr> {
+    if expect(lexed, |tok| match tok { Token::Times => true, _ => false }) {
+        return Some(parse2_products(lexed));
+    }
+    return None;
+}
+
+fn parse2_products(lexed : &mut Expectant) -> Expr {
+    let mut sum = parse2_sums(lexed);
+    while let Some(sum2) = parse2_next_sums(lexed) {
+        sum = Expr::Multiply(Box::new(sum), Box::new(sum2));
+    }
+    return sum;
+}
+
 fn eval(expr : Expr) -> u64 {
     match expr {
         Expr::Num(n) => n,
@@ -95,15 +176,20 @@ fn eval(expr : Expr) -> u64 {
 
 fn main() {
     let mut sum = 0;
+    let mut sum2 = 0;
     for wrapped_line in io::stdin().lock().lines() {
         let line = wrapped_line.unwrap();
         let lexed = lex(line);
-        let parsed = parse(&mut lexed.iter());
 
-        dbg!(&parsed);
+        let parsed = parse(&mut lexed.iter());
         let evaled = eval(parsed);
-        dbg!(evaled);
         sum += evaled;
+
+        let mut ex = Expectant { iter: &mut lexed.iter(), current_tok: None };
+        let parsed2 = parse2_products(&mut ex);
+        let evaled2 = eval(parsed2);
+        sum2 += evaled2;
     }
     println!("{}", sum);
+    println!("{}", sum2);
 }
