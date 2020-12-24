@@ -85,6 +85,13 @@ fn find_lines_from(line_length : usize, tiles_by_fingerprints : &HashMap<usize, 
     return result;
 }
 
+fn print_tile(rows: &Vec<Vec<bool>>) {
+    for (row_n, row) in rows.iter().enumerate() {
+        println!("{}", row.iter().enumerate().map(|(c_n, c)| (if *c { "#".to_string() } else { ".".to_string() }) + (if c_n % 10 == 9 { " " } else { "" })).collect::<String>());
+        if row_n % 10 == 9 { println!("\n") };
+    }
+}
+
 fn main() {
     let mut current_tile_id : usize = 0;
     let mut current_tile : Vec<Vec<bool>> = Vec::new();
@@ -154,6 +161,72 @@ fn main() {
         let last_row = &rows[rows.len() - 1];
         dbg!(&first_row[0], &first_row[first_row.len() - 1], &last_row[0], &last_row[last_row.len() - 1]);
         dbg!(first_row[0].id * first_row[first_row.len() - 1].id * last_row[0].id * last_row[last_row.len() - 1].id);
+    }
+
+    //                   # 
+    // #    ##    ##    ###
+    //  #  #  #  #  #  #    
+    let sea_monster_template = vec!(vec!(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true,  false), 
+                                    vec!(true,  false, false, false, false, true,  true,  false, false, false, false, true,  true,  false, false, false, false, true,  true,  true), 
+                                    vec!(false, true,  false, false, true,  false, false, true,  false, false, true,  false, false, true,  false, false, true,  false, false, false));
+ 
+ 
+    for rows in grids {
+        let mut grid : Vec<Vec<bool>> = Vec::new();
+        for row in &rows {
+            for extra_row in 0..8 {
+                grid.push(Vec::new());
+            }
+            for cell in row {
+                let mut tile_bools : Vec<Vec<bool>> = tiles.iter().find_map(|(id, bools)| if *id == cell.id {
+                    Some(bools[1..(bools.len()-1)].iter().map(|boolsrow| boolsrow[1..(boolsrow.len()-1)].to_vec()).collect())
+                } else {
+                    None
+                }).unwrap();
+                if cell.flipped {
+                    for row in 0..tile_bools.len() {
+                        for column in (row+1)..tile_bools[row].len() {
+                            let tmp = tile_bools[column][row];
+                            tile_bools[column][row] = tile_bools[row][column];
+                            tile_bools[row][column] = tmp;
+                        }
+                    }
+                }
+                for _ in 0..cell.rotation {
+                    tile_bools = (0..tile_bools.len()).map(|n| tile_bools.iter().map(|tile_bools_row| tile_bools_row[n]).rev().collect()).collect();
+                }
+
+                let current_top_row = grid.len() - tile_bools.len();
+                for (row_number, row) in tile_bools.iter().enumerate() {
+                    grid[current_top_row + row_number].extend(row);
+                }
+            }
+        }
+        //println!("\n\n");
+        dbg!(&rows.iter().map(|cols| cols.iter().map(|tile| format!("{}-R{}-F{}", tile.id, tile.rotation, if tile.flipped { 1 } else { 0 })).collect::<Vec<String>>().join(" ")).collect::<Vec<String>>());
+        //print_tile(&grid);
+        let mut sea_monster_count = 0;
+        for start_row_number in 0..(grid.len() - sea_monster_template.len()) {
+            'search: for start_col_number in 0..(grid[0].len() - sea_monster_template[0].len()) {
+                for row in 0..sea_monster_template.len() {
+                    for col in 0..sea_monster_template[0].len() {
+                        if sea_monster_template[row][col] {
+                           if !grid[start_row_number + row][start_col_number + col] {
+                               continue 'search;
+                           }
+                        }
+                    }
+                }
+                dbg!(start_row_number, start_col_number);
+                sea_monster_count += 1;
+            }
+        }
+        if (sea_monster_count > 0) {
+            let sea_monster_cells = sea_monster_template.iter().map(|sea_monster_row| sea_monster_row.iter()).flatten().filter(|t| **t).count();
+            let all_visible_cells = grid.iter().map(|grid_row| grid_row.iter()).flatten().filter(|t| **t).count();
+            dbg!(sea_monster_cells, sea_monster_count, all_visible_cells, all_visible_cells - sea_monster_count * sea_monster_cells);
+        }
+
     }
 }
 
