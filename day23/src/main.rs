@@ -3,20 +3,11 @@ use std::io::{self, Read};
 fn crab_game(mut circle: Vec<usize>, rounds : usize) -> Vec<usize> {
     let original_circle_len = circle.len();
 
-    let mut nexts : Vec<usize> = Vec::new();
-    nexts.resize(original_circle_len + 2, 0);
+    let mut nexts : [usize; 1000002] = [0; 1000002];
     for i in 0..circle.len() - 1 {
         nexts[circle[i]] = circle[i + 1];
     }
     nexts[circle[original_circle_len - 1]] = circle[0];
-
-
-    let mut prevs = vec!(circle.len() - 1);
-    prevs.resize(original_circle_len + 2, 0);
-    for i in 0..circle.len() - 1 {
-        prevs[circle[i + 1]] = circle[i];
-    }
-    prevs[circle[0]] = circle[original_circle_len - 1];
 
 
     let mut current_cup = circle[0];
@@ -29,7 +20,6 @@ fn crab_game(mut circle: Vec<usize>, rounds : usize) -> Vec<usize> {
             next_adjacent_to_current_cup = nexts[next_adjacent_to_current_cup];
         }
         nexts[current_cup] = next_adjacent_to_current_cup;
-        prevs[next_adjacent_to_current_cup] = current_cup;
 
         let mut destination_label = current_cup;
         loop {
@@ -45,15 +35,11 @@ fn crab_game(mut circle: Vec<usize>, rounds : usize) -> Vec<usize> {
 
         let after_destination_cup = nexts[destination_label];
         nexts[destination_label] = held_cups[0];
-        prevs[held_cups[0]] = destination_label;
-
         nexts[held_cups[2]] = after_destination_cup;
-        prevs[after_destination_cup] = held_cups[2];
         
         current_cup = nexts[current_cup];
     }
-    let last_cup = current_cup;
-    for index in (0..circle.len()) {
+    for index in 0..circle.len() {
         circle[index] = current_cup;
         current_cup = nexts[current_cup];
     }
